@@ -9,6 +9,7 @@ from pyspark.context import SparkContext
 import time
 import sqlite3
 from sqlite3 import Error
+import conn.db as db
 
 
 def print_hi(name):
@@ -20,17 +21,6 @@ def print_hi(name):
     print(csv)
 
 
-def create_connection(db_file):
-    """ create a database connection to a SQLite database """
-    conn = None
-    try:
-        conn = sqlite3.connect(db_file)
-        print(sqlite3.version)
-    except Error as e:
-        print(e)
-    finally:
-        if conn:
-            conn.close()
 
 
 #  print(sc.textFile("pepito.txt").first())
@@ -38,23 +28,9 @@ def create_connection(db_file):
 
 # Press the green button in the gutter to run the script.
 if __name__ == '__main__':
-   # print_hi('PyCharm')
-    conn = sqlite3.connect('test_database')
-    c = conn.cursor()
 
-    #create_connection(r"C:\..\..\..\challengeGlobalt\pythonsqlite.db")
-    c.execute('''
-              CREATE TABLE IF NOT EXISTS products
-              ([product_id] INTEGER PRIMARY KEY, [product_name] TEXT)
-              ''')
 
-    c.execute('''
-              CREATE TABLE IF NOT EXISTS prices
-              ([product_id] INTEGER PRIMARY KEY, [price] INTEGER)
-              ''')
+    db.initialize_data_base(formats=1,data=2,db=3)
 
-    conn.commit()
-    c.execute('''select * from products''')
-    df = pd.DataFrame(c.fetchall(), columns=['product_name','price'])
-    print(df)
+
 # See PyCharm help at https://www.jetbrains.com/help/pycharm/
