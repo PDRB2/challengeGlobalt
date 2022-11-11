@@ -12,13 +12,18 @@ from sqlite3 import Error
 import conn.db as db
 
 
-def print_hi(name):
-    import os
+def cargar_datos_iniciales():
 
-    # Use a breakpoint in the code line below to debug your script.
 
-    csv = pd.read_csv('jobs.csv')
-    print(csv)
+    csv = pd.read_csv('./archives/jobs.csv')
+    tipo_de_tabla = 'jobs'
+    db.insertarDatos(csv,tipo_de_tabla)
+    csv2 = pd.read_csv('./archives/departments.csv')
+    tipo_de_tabla = 'departments'
+    db.insertarDatos(csv2, tipo_de_tabla)
+    csv3 = pd.read_csv('./archives/hired_employees.csv')
+    tipo_de_tabla = 'hired_employees'
+    db.insertarDatos(csv3, tipo_de_tabla)
 
 
 
@@ -26,11 +31,8 @@ def print_hi(name):
 #  print(sc.textFile("pepito.txt").first())
 
 
-# Press the green button in the gutter to run the script.
 if __name__ == '__main__':
 
+    db.initialize_data_base()
+    cargar_datos_iniciales()
 
-    db.initialize_data_base(formats=1,data=2,db=3)
-
-
-# See PyCharm help at https://www.jetbrains.com/help/pycharm/

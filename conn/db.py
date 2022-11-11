@@ -14,9 +14,13 @@ def create_connection(db_file):
         if conn:
             conn.close()
 
-def initialize_data_base(formats, data, db):
-    conn = sqlite3.connect('../globalChallenge')
+def initialize_data_base():
+    conn = sqlite3.connect('globalChallenge')
     c = conn.cursor()
+
+    c.execute('''drop table hired_employees ''')
+    c.execute('''drop table departments ''')
+    c.execute('''drop table jobs ''')
 
     c.execute('''
               CREATE TABLE IF NOT EXISTS hired_employees
@@ -36,13 +40,40 @@ def initialize_data_base(formats, data, db):
                  ''')
 
     c.execute('''
-              CREATE TABLE IF NOT EXISTS prices
+              CREATE TABLE IF NOT EXISTS jobs
               ([id] INTEGER PRIMARY KEY --comment 'id of the department'
-              , [job] INTEGER --comment 'Name  of the job'
+              , [job] STRING --comment 'Name  of the job'
               )
               ''')
 
     conn.commit()
-    c.execute('''select * from prices''')
+    conn.close()
+
+
+    print('llegue a incializar la base')
+
+
+def buscarColumnasTabla(csv, tipo_de_tabla):
+    if tipo_de_tabla =='jobs':
+                    csv.columns = ['id','job']
+    elif tipo_de_tabla == 'departments':
+                    csv.columns = ['id', 'department']
+    else   :
+        csv.columns = ['id', 'name', 'datetime', 'department_id', 'job_id']
+    return csv
+
+
+def insertarDatos(csv, tipo_de_tabla):
+    conn = sqlite3.connect('../globalChallenge')
+    c = conn.cursor()
+    csv = buscarColumnasTabla(csv,tipo_de_tabla)
+    print(csv)
+    csv.to_sql(tipo_de_tabla, conn, if_exists='replace',index=False)
+    print('logre insertarme!')
+
+    c.execute('''select * from '''+tipo_de_tabla + '''''')
     print(c.fetchall())
-    print('llegue a incializar')
+    conn.commit()
+    conn.close()
+
+    return None
