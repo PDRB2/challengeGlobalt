@@ -10,6 +10,7 @@ import time
 import sqlite3
 from sqlite3 import Error
 import conn.db as db
+import api as rest_api
 
 
 def cargar_datos_iniciales():
@@ -33,6 +34,6 @@ def cargar_datos_iniciales():
 
 if __name__ == '__main__':
 
-    db.initialize_data_base()
-    cargar_datos_iniciales()
-
+    #db.initialize_data_base()
+    #cargar_datos_iniciales()
+    rest_api.iniciar()
