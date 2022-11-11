@@ -66,13 +66,10 @@ def buscarColumnasTabla(csv, tipo_de_tabla):
 def insertarDatos(csv, tipo_de_tabla):
     conn = sqlite3.connect('../globalChallenge')
     c = conn.cursor()
+
     csv = buscarColumnasTabla(csv,tipo_de_tabla)
-    print(csv)
     csv.to_sql(tipo_de_tabla, conn, if_exists='replace',index=False)
     print('logre insertarme!')
-
-    c.execute('''select * from '''+tipo_de_tabla + '''''')
-    print(c.fetchall())
     conn.commit()
     conn.close()
 
