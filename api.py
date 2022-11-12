@@ -11,8 +11,11 @@ def datos():
     print(request.is_json)
     content = request.get_json()
     try:
-        print(content['tabla'])
-        print(content['registros'])
+        #print(content['tablas'])
+
+
+        #print(json_registros['tabla'])
+        #print(json_registros['registros'])
         print(insertarRegistros(content, db))
     except:
         return 'JSON INCORRECTAMENTE FORMADO'
@@ -22,11 +25,16 @@ def datos():
 def insertarRegistros(content, db):
     try:
          print('todo va bien')
-         print(content['registros'])
-         data = json_normalize(content['registros'])
-         db.insertarDatos(data,content['tabla'])
+         data = pd.json_normalize(content['tables'])
+         for index, row in data.iterrows():
+             print(row['table'])
+             registros = pd.json_normalize(row['record_info'])
+             print(registros)
+             db.insertarDatos(registros,row['table'])
+
 
     except:
+
         return 'JSON NO LEIBLE'
     pass
 
