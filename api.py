@@ -11,15 +11,10 @@ def datos():
     print(request.is_json)
     content = request.get_json()
     try:
-        #print(content['tablas'])
-
-
-        #print(json_registros['tabla'])
-        #print(json_registros['registros'])
-        print(insertarRegistros(content, db))
+        respuesta_api =(insertarRegistros(content, db))
     except:
         return 'JSON INCORRECTAMENTE FORMADO'
-    return 'JSON posted'
+    return respuesta_api
 
 
 def insertarRegistros(content, db):
@@ -30,8 +25,8 @@ def insertarRegistros(content, db):
              print(row['table'])
              registros = pd.json_normalize(row['record_info'])
              print(registros)
-             db.insertarDatos(registros,row['table'])
-
+             mensaje = db.insertarDatos(registros,row['table'])
+             return(mensaje)
 
     except:
 
