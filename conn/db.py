@@ -3,6 +3,9 @@ from sqlite3 import Error
 
 import pandas as pd
 import pandavro as pdx
+import logging as logging
+
+logging.basicConfig(filename='db.log', filemode='w', format='%(name)s - %(levelname)s - %(message)s')
 
 
 def create_connection(db_file):
@@ -52,8 +55,7 @@ def initialize_data_base():
 
     conn.commit()
     conn.close()
-
-    print('llegue a incializar la base')
+    logging.info('llegue a incializar la base')
 
 
 def buscarColumnasTabla(csv, tipo_de_tabla):
@@ -90,15 +92,15 @@ def son_metadatos_invalidos(csv, tipo_de_tabla):
 
     i = 0
     es_valido = False
-    print('Metadatos del archivo ' + str(result.iloc[0]))
-    print('Metadatos del schema ' + str(metadatos_validos['tipo_dato'].iloc[0]))
+
+    logging.info('Metadatos del archivo ' + str(result.iloc[0]))
+    logging.info('Metadatos del schema ' + str(metadatos_validos['tipo_dato'].iloc[0]))
     while i < len(result):
         es_valido = str(result.iloc[i]) == str(metadatos_validos['tipo_dato'].iloc[i])
         if es_valido == False:
             i = len(result)
         i = i + 1
 
-    print('Los metadatos son validos? ')
     return es_valido
 
 
@@ -106,15 +108,13 @@ def generarBackup(conn):
     cursor = conn.cursor()
     TIPO_DE_TABLA = ['jobs', 'departments', 'hired_employees']
     PATH_FINAL = './backups/'
-    print('antes de arrancar a ver que hay')
 
     for i in TIPO_DE_TABLA:
-        print(i)
         cursor.execute('''Select * from ''' + i)
         df = pd.DataFrame.from_records(cursor.fetchall(),
                                        columns=[desc[0] for desc in cursor.description])
         pdx.to_avro(PATH_FINAL + i + '.avro', df)
-        print('Backup generado exitosamente para ' + i)
+        logging.info('Backup generado exitosamente para ' + i)
 
     pass
 
@@ -122,7 +122,6 @@ def generarBackup(conn):
 def existen_los_registros_anteriormente(csv, conn, tipo_de_tabla):
     # en este caso recuperamos los id correspondientes a la tabla tomando la conneccion para
     # verificar la norma de negocio de primary key
-    print('vamos a validar si existen anteriormente')
     existe = False
     i = 0
     compare_df = pd.read_sql('SELECT DISTINCT(id) FROM ' + tipo_de_tabla + ' where id is not null;', conn)
@@ -130,7 +129,6 @@ def existen_los_registros_anteriormente(csv, conn, tipo_de_tabla):
         if csv.iloc[i, 0] in compare_df.values:
             existe = True
         i = i + 1
-    print(existe)
     return existe
 
 
@@ -141,14 +139,16 @@ def insertarDatos(csv, tipo_de_tabla):
     try:
         csv = buscarColumnasTabla(csv, tipo_de_tabla)
         if len(csv) > 1000:
+            logging.warning('Error en la ingesta de ' + tipo_de_tabla + ' se encuentran mas de 1000 registros')
             return 'Error en la ingesta de ' + tipo_de_tabla + ' se encuentran mas de 1000 registros'
         if not (son_metadatos_invalidos(csv, tipo_de_tabla)):
-            print('voy a devolver el error metadata invalida')
+            logging.warning('Error en el lote ingestado de ' + tipo_de_tabla + 'Los metadatos no se corresponden')
             return 'Error en el lote ingestado de ' + tipo_de_tabla + 'Los metadatos no se corresponden'
         if existen_los_registros_anteriormente(csv, conn, tipo_de_tabla):
-            print('voy a devolver el error existe anteriormente')
+            logging.warning('Error en los registros insertados existen anteriormente para la tabla ' + tipo_de_tabla)
             return 'Error en los registros insertados existen anteriormente para la tabla ' + tipo_de_tabla
-        print('validaciones completadas')
+
+        logging.info('validaciones completadas')
         csv.set_index('id', inplace=True)
         csv.to_sql(tipo_de_tabla, conn, if_exists='append', index=True)
         generarBackup(conn)

@@ -1,6 +1,7 @@
 from flask import Flask, request, jsonify, app
 import pandas as pd
-from pandas.io.json import json_normalize
+import logging as logging
+logging.basicConfig(filename='api.log', filemode='w', format='%(name)s - %(levelname)s - %(message)s')
 
 app = Flask(__name__)
 import conn.db as db
@@ -13,23 +14,24 @@ def datos():
     try:
         respuesta_api =(insertarRegistros(content, db))
     except:
+        logging.warning('No se cargo correctamente el registro enviado')
         return 'JSON INCORRECTAMENTE FORMADO'
+    logging.info('Se cargo correctamente el registro enviado')
     return respuesta_api
 
 
 def insertarRegistros(content, db):
     try:
-         print('todo va bien')
+
          data = pd.json_normalize(content['tables'])
          for index, row in data.iterrows():
-             print(row['table'])
              registros = pd.json_normalize(row['record_info'])
-             print(registros)
              mensaje = db.insertarDatos(registros,row['table'])
              return(mensaje)
 
     except:
 
+        logging.warning('No se leyo correctamente el json , incumplimiento del contrato')
         return 'JSON NO LEIBLE'
     pass
 
