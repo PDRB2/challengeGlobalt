@@ -1,12 +1,14 @@
+import logging
+import os
 import sqlite3
 from sqlite3 import Error
 
 import pandas as pd
 import pandavro as pdx
-import logging as logging
 
-logging.basicConfig(filename='db.log', filemode='w', format='%(name)s - %(levelname)s - %(message)s')
+from api import handle
 
+logger2 = logging.getLogger(handle)
 
 def create_connection(db_file):
     """ create a database connection to a SQLite database """
@@ -55,7 +57,7 @@ def initialize_data_base():
 
     conn.commit()
     conn.close()
-    logging.info('llegue a incializar la base')
+    logger2.info('llegue a incializar la base')
 
 
 def buscarColumnasTabla(csv, tipo_de_tabla):
@@ -93,8 +95,8 @@ def son_metadatos_invalidos(csv, tipo_de_tabla):
     i = 0
     es_valido = False
 
-    logging.info('Metadatos del archivo ' + str(result.iloc[0]))
-    logging.info('Metadatos del schema ' + str(metadatos_validos['tipo_dato'].iloc[0]))
+    logger2.info('Metadatos del archivo ' + str(result.iloc[0]))
+    logger2.info('Metadatos del schema ' + str(metadatos_validos['tipo_dato'].iloc[0]))
     while i < len(result):
         es_valido = str(result.iloc[i]) == str(metadatos_validos['tipo_dato'].iloc[i])
         if es_valido == False:
@@ -114,7 +116,7 @@ def generarBackup(conn):
         df = pd.DataFrame.from_records(cursor.fetchall(),
                                        columns=[desc[0] for desc in cursor.description])
         pdx.to_avro(PATH_FINAL + i + '.avro', df)
-        logging.info('Backup generado exitosamente para ' + i)
+        logger2.info('Backup generado exitosamente para ' + i)
 
     pass
 
@@ -139,16 +141,16 @@ def insertarDatos(csv, tipo_de_tabla):
     try:
         csv = buscarColumnasTabla(csv, tipo_de_tabla)
         if len(csv) > 1000:
-            logging.warning('Error en la ingesta de ' + tipo_de_tabla + ' se encuentran mas de 1000 registros')
+            logger2.info('Error en la ingesta de ' + tipo_de_tabla + ' se encuentran mas de 1000 registros')
             return 'Error en la ingesta de ' + tipo_de_tabla + ' se encuentran mas de 1000 registros'
         if not (son_metadatos_invalidos(csv, tipo_de_tabla)):
-            logging.warning('Error en el lote ingestado de ' + tipo_de_tabla + 'Los metadatos no se corresponden')
+            logger2.info('Error en el lote ingestado de ' + tipo_de_tabla + 'Los metadatos no se corresponden')
             return 'Error en el lote ingestado de ' + tipo_de_tabla + 'Los metadatos no se corresponden'
         if existen_los_registros_anteriormente(csv, conn, tipo_de_tabla):
-            logging.warning('Error en los registros insertados existen anteriormente para la tabla ' + tipo_de_tabla)
+            logger2.info('Error en los registros insertados existen anteriormente para la tabla ' + tipo_de_tabla)
             return 'Error en los registros insertados existen anteriormente para la tabla ' + tipo_de_tabla
 
-        logging.info('validaciones completadas')
+        logger2.info('validaciones completadas')
         csv.set_index('id', inplace=True)
         csv.to_sql(tipo_de_tabla, conn, if_exists='append', index=True)
         generarBackup(conn)
@@ -158,11 +160,36 @@ def insertarDatos(csv, tipo_de_tabla):
     except:
         return 'Error de logicas ' + tipo_de_tabla
 
-
 def insertardatos_y_bkp(csv, tipo_de_tabla):
     conn = sqlite3.connect('../globalChallenge')
     csv = buscarColumnasTabla(csv, tipo_de_tabla)
+    csv.set_index('id', inplace=True)
     csv.to_sql(tipo_de_tabla, conn, if_exists='replace', index=False)
     conn.commit()
     conn.close()
+    return None
+
+
+def restaurarultimo_bkp(conn):
+    dir_path = './backups'
+    paths = os.listdir(dir_path)
+    logger2.info('Se procede a buscar los archivos avro para rearmar la base de 0')
+    for i in paths:
+            backup = pdx.read_avro(dir_path+ '/' +i, na_dtypes=True)
+            sinfilename = (i.split('.',1))
+            insertardatos_y_bkp(backup,sinfilename[0])
+            logger2.info('Se restauro el backup ' + sinfilename[0])
+
+    pass
+
+
+def borrar_y_restaurar_bkp():
+    #borramos las tablas validamos que no exista nada mas
+    initialize_data_base()
+    conn = sqlite3.connect('globalChallenge')
+    c = conn.cursor()
+    restaurarultimo_bkp(conn)
+    conn.commit()
+    conn.close()
+    logger2.info('Se logro reanudar toda la base')
     return None

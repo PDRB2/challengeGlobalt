@@ -23,4 +23,5 @@ if __name__ == '__main__':
 
     db.initialize_data_base()
     cargar_datos_iniciales()
-    rest_api.iniciar()
+    #rest_api.iniciar()
+    db.borrar_y_restaurar_bkp()
