@@ -5,23 +5,26 @@ import conn.db as db
 import api as rest_api
 
 
-def cargar_datos_iniciales():
-
-
-    csv = pd.read_csv('./archives/jobs.csv')
-    tipo_de_tabla = 'jobs'
-    db.insertardatos_y_bkp(csv, tipo_de_tabla)
-    csv2 = pd.read_csv('./archives/departments.csv')
-    tipo_de_tabla = 'departments'
-    db.insertardatos_y_bkp(csv2, tipo_de_tabla)
-    csv3 = pd.read_csv('./archives/hired_employees.csv')
-    tipo_de_tabla = 'hired_employees'
-    db.insertardatos_y_bkp(csv3, tipo_de_tabla)
-
 
 if __name__ == '__main__':
+    opciones = ['1','2','3']
+    #inicia la base y crea de nuevo todas las tablas
+    #el loop no era una condicion para el desafio pero quedo como un agregado para poder hacerlo mas completa
+    #la solucion , sencillamente lo que hace es forzar al funcionamiento desado
+    #esta solucion solo en caso que se restaure el backup se tomaran los registros que guarde la api
 
-    db.initialize_data_base()
-    cargar_datos_iniciales()
-    #rest_api.iniciar()
-    db.borrar_y_restaurar_bkp()
+    opcion = input("Eliga su opcion: 1 iniciar apy , 2 borrar_la_base , 3 restaurar backup")
+    while opcion not in opciones :
+        opcion = input("Opcion incorrecta: 1 iniciar apy , 2 borrar_la_base , 3 restaurar backup ")
+    if opcion == '1':
+        db.initialize_data_base()
+        db.cargar_datos_iniciales()
+        rest_api.iniciar()
+    elif opcion == '2':
+        db.initialize_data_base()
+    elif opcion == '3':
+        db.restaurar_bkp()
+
+
+
+

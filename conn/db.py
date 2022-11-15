@@ -126,11 +126,14 @@ def existen_los_registros_anteriormente(csv, conn, tipo_de_tabla):
     # verificar la norma de negocio de primary key
     existe = False
     i = 0
-    compare_df = pd.read_sql('SELECT DISTINCT(id) FROM ' + tipo_de_tabla + ' where id is not null;', conn)
-    while not existe and i < len(csv):
-        if csv.iloc[i, 0] in compare_df.values:
+    cursor = conn.cursor()
+    cursor.execute('''SELECT DISTINCT id FROM ''' + tipo_de_tabla )
+    compare_df = pd.DataFrame.from_records(cursor.fetchall(),columns=[desc[0] for desc in cursor.description])
+    print(compare_df)
+    if csv.iloc[:, 0].isin(compare_df.iloc[:,0]).any():
             existe = True
-        i = i + 1
+
+    print('se  valido si existe')
     return existe
 
 
@@ -149,7 +152,6 @@ def insertarDatos(csv, tipo_de_tabla):
         if existen_los_registros_anteriormente(csv, conn, tipo_de_tabla):
             logger2.info('Error en los registros insertados existen anteriormente para la tabla ' + tipo_de_tabla)
             return 'Error en los registros insertados existen anteriormente para la tabla ' + tipo_de_tabla
-
         logger2.info('validaciones completadas')
         csv.set_index('id', inplace=True)
         csv.to_sql(tipo_de_tabla, conn, if_exists='append', index=True)
@@ -164,7 +166,7 @@ def insertardatos_y_bkp(csv, tipo_de_tabla):
     conn = sqlite3.connect('../globalChallenge')
     csv = buscarColumnasTabla(csv, tipo_de_tabla)
     csv.set_index('id', inplace=True)
-    csv.to_sql(tipo_de_tabla, conn, if_exists='replace', index=False)
+    csv.to_sql(tipo_de_tabla, conn, if_exists='replace', index=True)
     conn.commit()
     conn.close()
     return None
@@ -183,7 +185,7 @@ def restaurarultimo_bkp(conn):
     pass
 
 
-def borrar_y_restaurar_bkp():
+def restaurar_bkp():
     #borramos las tablas validamos que no exista nada mas
     initialize_data_base()
     conn = sqlite3.connect('globalChallenge')
@@ -192,4 +194,62 @@ def borrar_y_restaurar_bkp():
     conn.commit()
     conn.close()
     logger2.info('Se logro reanudar toda la base')
+    return None
+
+
+
+
+def cargar_datos_iniciales():
+        #se validan si los datos iniciales se encuentran presentes sino se insertan.
+        paths = ['./archives/jobs.csv','./archives/departments.csv','./archives/hired_employees.csv']
+        tablas = ['jobs','departments','hired_employees']
+        i = 0
+        conn = sqlite3.connect('../globalChallenge')
+        cursor = conn.cursor()
+        existen = False
+        while i < len(paths) and not existen:
+            cursor.execute('''SELECT * FROM  ''' + tablas[i])
+            csv = pd.read_csv(paths[i])
+            df = pd.DataFrame.from_records(cursor.fetchall(),
+                                           columns=[desc[0] for desc in cursor.description])
+            if df.iloc[:,0].isin(csv.iloc[:,0]).any():
+                existen = True
+            i = i +1
+        conn.commit()
+        conn.close()
+        if not existen:
+            logger2.info('Se procede a cargar los registros iniciales')
+            j =0
+            while j < len(paths):
+                csv = pd.read_csv(paths[j])
+                insertardatos_y_bkp(csv,tablas[j])
+                j = j +1
+        else :
+            logger2.info('Registros iniciales cargados!')
+        return existen
+
+
+def obtenerMetricas1():
+    conn = sqlite3.connect('../globalChallenge')
+    cursor = conn.cursor()
+    print(' antes de la query')
+    cursor.execute('''drop table metricas_1 ''')
+    cursor.execute('''
+    CREATE TABLE metricas_1 AS
+    select department, job, empleado , fecha , cast(mes as int) as mes into metricas_1 from (
+    Select department , jo.job , hired.name as empleado ,substr( hired.datetime, 0, 11 )   as fecha,
+    cast(substr( hired.datetime, 6, 2 ) as int) as mes 
+       from
+    hired_employees hired inner join
+    jobs jo on hired.job_id = jo.id
+    inner join departments dep
+    on dep.id =hired.department_id  
+     where substr( hired.datetime, 1, 4 ) = '2021'
+      ) b
+    
+    ''')
+    print(' dps de la query')
+    print(cursor.fetchall())
+    conn.commit()
+    conn.close()
     return None

@@ -37,6 +37,26 @@ def datos():
     return respuesta_api
 
 
+@app.route('/metricas1', methods=["get"])
+def metricas1():
+
+        user = request.headers.get('user')
+        credentials = request.headers.get('credentials')
+
+        if not validarCredenciales(user,credentials):
+            logging.info(' el usuario ' +user + ' es desnocido y se le a denegado acceso')
+            return 'No tiene permisos para acceder.'
+
+        logging.info('el usuario ' + user + ' se logeo correctamente')
+        print(db.obtenerMetricas1())
+        return {
+            "greeting": ["hello", "world"],
+            "date": 'hola'
+        }
+
+
+
+
 def insertarRegistros(content, db):
     try:
 
