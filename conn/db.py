@@ -9,28 +9,62 @@ import pandavro as pdx
 from api import handle
 
 logger2 = logging.getLogger(handle)
+CUATRIMESTRES = ['1 and 3', '4 and 6', '7 and 9', '10 and 12']
+CONVERT_DICT_METRICAS_1 = {'department': object,
+                           'job': object,
+                           'Q1': int,
+                           'Q2': int,
+                           'Q3': int,
+                           'Q4': int
+                           }
+CONVERT_DICT_METRICAS_2 = {'department_id': int,
+                           'department': object,
+                           'hired': int
+                           }
+CONSULTAS_METRICAS = [
+'''select department, job, cantidad  , mes as mes from (
+        Select department , jo.job ,count(hired.id) as cantidad , cast(substr( hired.datetime, 6, 2 ) as int) as mes 
+           from
+        hired_employees hired inner join
+        jobs jo on hired.job_id = jo.id
+        inner join departments dep
+        on dep.id =hired.department_id  
+         where substr( hired.datetime, 1, 4 ) = '2021'
+         group by department,jo.job , cast(substr( hired.datetime, 6, 2 ) as int)  
+          ) b
+       ''' , '''select dep.id as department_id, dep.department as department , count(hired.id)  as cantidad ,(select Avg(hired.id)  from
+          hired_employees hired  where substr( hired.datetime, 1, 4 ) = '2021'  )as cantidad_media
+        from departments dep
+        inner join hired_employees hired on  dep.id =hired.department_id  
+        where substr( hired.datetime, 1, 4 ) = '2021' 
+        group by dep.id , dep.department
+        '''
+]
 
 def create_connection(db_file):
     """ create a database connection to a SQLite database """
     conn = None
     try:
         conn = sqlite3.connect(db_file)
-        print(sqlite3.version)
+        logger2.info(sqlite3.version)
     except Error as e:
-        print(e)
+        logger2.info(e)
     finally:
         if conn:
             conn.close()
 
 
 def initialize_data_base():
-    conn = sqlite3.connect('globalChallenge')
+    conn = getConn()
     c = conn.cursor()
 
-    c.execute('''drop table hired_employees ''')
-    c.execute('''drop table departments ''')
-    c.execute('''drop table jobs ''')
-
+    #c.execute("delete from hired_employees ")
+    c.execute('''DROP TABLE IF EXISTS  hired_employees ''')
+    c.execute('''DROP TABLE IF EXISTS  departments ''')
+    c.execute('''DROP TABLE IF EXISTS jobs ''')
+    c.execute('''DROP TABLE IF EXISTS metricas1 ''')
+    c.execute('''DROP TABLE IF EXISTS metricas2 ''')
+    conn.commit()
     c.execute('''
               CREATE TABLE IF NOT EXISTS hired_employees
               ([id] INTEGER PRIMARY KEY --comment 'id of the employee'
@@ -54,7 +88,27 @@ def initialize_data_base():
               , [job] STRING --comment 'Name  of the job'
               )
               ''')
-
+    c.execute('''
+                 CREATE TABLE IF NOT EXISTS metricas1
+                 ([id] INTEGER PRIMARY KEY --comment 'id of the department'
+                   ,   [department] STRING --comment 'Name  of the department'
+                    , [job] STRING --comment 'Name  of the job'
+                    ,[cantidad] INTEGER --comment 'month of the metric'
+                    ,[mes] INTEGER --comment 'month of the metric'
+                    
+              )
+                 ''')
+    c.execute('''
+                    CREATE TABLE IF NOT EXISTS metricas2
+                    ([id] INTEGER PRIMARY KEY --comment 'id of the department'
+                       , [department_id] integer 
+                       , [department] STRING --comment 'Name  of the department'
+                       , [cantidad] INTEGER --comment 'Name  of the job'
+                       ,[cantidad_media] INTEGER --comment 'month of the metric'
+                    
+                 )
+                    ''')
+    c.close()
     conn.commit()
     conn.close()
     logger2.info('llegue a incializar la base')
@@ -129,18 +183,24 @@ def existen_los_registros_anteriormente(csv, conn, tipo_de_tabla):
     cursor = conn.cursor()
     cursor.execute('''SELECT DISTINCT id FROM ''' + tipo_de_tabla )
     compare_df = pd.DataFrame.from_records(cursor.fetchall(),columns=[desc[0] for desc in cursor.description])
-    print(compare_df)
     if csv.iloc[:, 0].isin(compare_df.iloc[:,0]).any():
             existe = True
-
-    print('se  valido si existe')
+    cursor.close()
+    logger2.info('se  valido si existe')
     return existe
 
 
-def insertarDatos(csv, tipo_de_tabla):
+def getConn():
+    database = r"globalChallenge.db"
+    conn = sqlite3.connect(database)
+    return conn
+
+
+
+def insertarDatosDeApi(csv, tipo_de_tabla):
     # en este metodo vamos a buscar las columnas , validar cantidad de archivos y validar metadatos
     # la coneccion a la base es para abrir y cerrar
-    conn = sqlite3.connect('../globalChallenge')
+    conn = getConn()
     try:
         csv = buscarColumnasTabla(csv, tipo_de_tabla)
         if len(csv) > 1000:
@@ -163,7 +223,7 @@ def insertarDatos(csv, tipo_de_tabla):
         return 'Error de logicas ' + tipo_de_tabla
 
 def insertardatos_y_bkp(csv, tipo_de_tabla):
-    conn = sqlite3.connect('../globalChallenge')
+    conn =  getConn()
     csv = buscarColumnasTabla(csv, tipo_de_tabla)
     csv.set_index('id', inplace=True)
     csv.to_sql(tipo_de_tabla, conn, if_exists='replace', index=True)
@@ -188,7 +248,7 @@ def restaurarultimo_bkp(conn):
 def restaurar_bkp():
     #borramos las tablas validamos que no exista nada mas
     initialize_data_base()
-    conn = sqlite3.connect('globalChallenge')
+    conn = getConn()
     c = conn.cursor()
     restaurarultimo_bkp(conn)
     conn.commit()
@@ -204,7 +264,7 @@ def cargar_datos_iniciales():
         paths = ['./archives/jobs.csv','./archives/departments.csv','./archives/hired_employees.csv']
         tablas = ['jobs','departments','hired_employees']
         i = 0
-        conn = sqlite3.connect('../globalChallenge')
+        conn = getConn()
         cursor = conn.cursor()
         existen = False
         while i < len(paths) and not existen:
@@ -214,42 +274,105 @@ def cargar_datos_iniciales():
                                            columns=[desc[0] for desc in cursor.description])
             if df.iloc[:,0].isin(csv.iloc[:,0]).any():
                 existen = True
+            else:
+                insertardatos_y_bkp(csv, tablas[i])
             i = i +1
         conn.commit()
         conn.close()
         if not existen:
-            logger2.info('Se procede a cargar los registros iniciales')
-            j =0
-            while j < len(paths):
-                csv = pd.read_csv(paths[j])
-                insertardatos_y_bkp(csv,tablas[j])
-                j = j +1
+            logger2.info('Se insertaron los registros iniciales')
         else :
             logger2.info('Registros iniciales cargados!')
         return existen
 
 
-def obtenerMetricas1():
-    conn = sqlite3.connect('../globalChallenge')
+def buscarConsultasMetricas(metricas1 ):
+    #metodo para buscar en las metricas correspondientes
+    # se busca mejor manera de relacionar evitando if, probablemente numerico desde origen
+    opcion = 0
+    opcion2 = 1
+    sql = ''
+    if metricas1 == 'metricas1':
+        sql = CONSULTAS_METRICAS[opcion]
+    elif metricas1 == 'metricas2':
+        sql = CONSULTAS_METRICAS[opcion2]
+        #sql = CONSULTAS_METRICAS[opcion]
+    logger2.info('Se procede a devolver la query de metricas ' + metricas1 )
+    return sql
+
+
+def cargarTablaMetricas(conn, metricas1):
+    #con este metodo se va a poblar la tabla que a posterior se presentaran los resultados
     cursor = conn.cursor()
-    print(' antes de la query')
-    cursor.execute('''drop table metricas_1 ''')
+    tabla = metricas1
+    query = buscarConsultasMetricas(metricas1)
+    logger2.info('Se procede a ingestar la metricas ' + metricas1)
+    cursor.execute(query)
+    df = pd.DataFrame.from_records(cursor.fetchall(),
+                                   columns=[desc[0] for desc in cursor.description])
+    df.to_sql(tabla, conn, if_exists='replace', index=True)
+
+    pass
+
+
+
+def obtener_datos_del_cuatrimestre(cuatrimestre , numero_de_cuatrimestre,conn):
+    #Se genera un dataframe acorde a la query de negocio
+    cursor = conn.cursor()
     cursor.execute('''
-    CREATE TABLE metricas_1 AS
-    select department, job, empleado , fecha , cast(mes as int) as mes into metricas_1 from (
-    Select department , jo.job , hired.name as empleado ,substr( hired.datetime, 0, 11 )   as fecha,
-    cast(substr( hired.datetime, 6, 2 ) as int) as mes 
-       from
-    hired_employees hired inner join
-    jobs jo on hired.job_id = jo.id
-    inner join departments dep
-    on dep.id =hired.department_id  
-     where substr( hired.datetime, 1, 4 ) = '2021'
-      ) b
-    
-    ''')
-    print(' dps de la query')
-    print(cursor.fetchall())
+    select department, job, cantidad as Q'''+numero_de_cuatrimestre+'''
+     from metricas1 where mes between ''' + cuatrimestre + '''
+                   order by department , job ''')
+    df = pd.DataFrame.from_records(cursor.fetchall(), columns=[desc[0] for desc in cursor.description])
+    df['Q'+numero_de_cuatrimestre] = df['Q'+numero_de_cuatrimestre].astype(int)
+
+    return df
+    pass
+
+
+
+
+def obtenerMetricas1(metricas):
+    conn = getConn()
+    cargarTablaMetricas(conn, metricas)
+    centinela = 'vacio'
+    j = 1
+    logger2.info('Se procede a generar el dataframe acorde a las nesesidades de negocio')
+    for i in CUATRIMESTRES:
+            df = obtener_datos_del_cuatrimestre(i,str(j),conn)
+            if centinela  =='vacio':
+                centinela = 'no vacio'
+                df_row = df.copy()
+            else :
+                df_row = pd.concat([df, df_row])
+
+            j = j +1
+
+    df_row.sort_values(['department', 'job'])
+    df_row = df_row.fillna(0)
+    df_row = df_row.astype(CONVERT_DICT_METRICAS_1)
+    result = pd.DataFrame(df_row).to_json(orient='records')
     conn.commit()
     conn.close()
-    return None
+    return result
+
+
+
+
+def obtenerMetricas2(metricas):
+    conn = getConn()
+    cargarTablaMetricas(conn,metricas)
+
+    logger2.info('Se procede a generar el dataframe acorde a las nesesidades de negocio')
+    cursor = conn.cursor()
+    cursor.execute('Select department_id , department , cantidad_media as hired from metricas2 where cantidad > cantidad_media order by cantidad desc')
+
+    df = pd.DataFrame.from_records(cursor.fetchall(), columns=[desc[0] for desc in cursor.description])
+    print('obtube el df')
+    df = df.astype(CONVERT_DICT_METRICAS_2)
+    print('converti el diccionario')
+    result = pd.DataFrame(df).to_json(orient='records')
+    print(result)
+
+
+    return result
