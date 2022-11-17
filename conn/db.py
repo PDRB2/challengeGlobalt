@@ -6,8 +6,9 @@ from sqlite3 import Error
 import pandas as pd
 import pandavro as pdx
 
-from api import handle
+from router.api import handle
 
+logging.basicConfig(level="INFO", format="%(levelname)s:%(asctime)s:%(message)s", filename='../api.log')
 logger2 = logging.getLogger(handle)
 CUATRIMESTRES = ['1 and 3', '4 and 6', '7 and 9', '10 and 12']
 CONVERT_DICT_METRICAS_1 = {'department': object,
@@ -40,6 +41,7 @@ CONSULTAS_METRICAS = [
         group by dep.id , dep.department
         '''
 ]
+VALOR_METRICAS = ['metricas1','metricas2']
 
 def create_connection(db_file):
     """ create a database connection to a SQLite database """
@@ -140,6 +142,17 @@ def obtenerMetadatosValidos(tipo_de_tabla):
     return metadatos_validos
 
 
+def buscarSqlInjection(csv):
+    #en este metodo buscamos si existe alguna injeccion de sql para poder evitarlo
+    # el false implica que el resultado devuelva true para que continue con el ciclo de validacion de registros
+
+    df = pd.DataFrame(csv.copy(), columns=['string'])
+    existe_injeccion_sql = False
+    existe_injeccion_sql = (df['string'].str.contains('Select').any() and df['string'].str.contains('Create').any() and df['string'].str.contains('Delete').any() and df['string'].str.contains('Drop').any() and df['string'].str.contains('Alter').any() )  ==False
+
+    return existe_injeccion_sql
+
+
 def son_metadatos_invalidos(csv, tipo_de_tabla):
     # buscamos los metadatos y validamos contra los informados en caso que
     # ya una condicion no cumpla se limita y se reporta el error
@@ -151,8 +164,11 @@ def son_metadatos_invalidos(csv, tipo_de_tabla):
 
     logger2.info('Metadatos del archivo ' + str(result.iloc[0]))
     logger2.info('Metadatos del schema ' + str(metadatos_validos['tipo_dato'].iloc[0]))
+
     while i < len(result):
         es_valido = str(result.iloc[i]) == str(metadatos_validos['tipo_dato'].iloc[i])
+        if str(metadatos_validos['tipo_dato'].iloc[i]) == 'object' :
+            es_valido = buscarSqlInjection(csv.iloc[:, i])
         if es_valido == False:
             i = len(result)
         i = i + 1
@@ -286,17 +302,30 @@ def cargar_datos_iniciales():
         return existen
 
 
+def buscarNumeroMetrica(metricas1):
+    #metodo que busca el numero de metrica en la constante de valor de metricas para
+    #de esta manera dejarlo en una forma abierta a que se pueda expandir en un futuro
+    opcion = -1
+    index = 0
+    while opcion == -1 and index < len(VALOR_METRICAS):
+        if metricas1 == VALOR_METRICAS[index]:
+                opcion = index
+        index = index +1
+
+    return opcion
+
+
 def buscarConsultasMetricas(metricas1 ):
     #metodo para buscar en las metricas correspondientes
     # se busca mejor manera de relacionar evitando if, probablemente numerico desde origen
     opcion = 0
     opcion2 = 1
+    opcion = buscarNumeroMetrica(metricas1)
     sql = ''
     if metricas1 == 'metricas1':
         sql = CONSULTAS_METRICAS[opcion]
     elif metricas1 == 'metricas2':
         sql = CONSULTAS_METRICAS[opcion2]
-        #sql = CONSULTAS_METRICAS[opcion]
     logger2.info('Se procede a devolver la query de metricas ' + metricas1 )
     return sql
 
@@ -344,13 +373,14 @@ def obtenerMetricas1(metricas):
                 centinela = 'no vacio'
                 df_row = df.copy()
             else :
-                df_row = pd.concat([df, df_row])
+                df_row= pd.merge(df_row, df,how='left')
 
             j = j +1
 
-    df_row.sort_values(['department', 'job'])
+    df_row = df_row.drop_duplicates()
     df_row = df_row.fillna(0)
     df_row = df_row.astype(CONVERT_DICT_METRICAS_1)
+    df_row.sort_values(['department', 'job'])
     result = pd.DataFrame(df_row).to_json(orient='records')
     conn.commit()
     conn.close()

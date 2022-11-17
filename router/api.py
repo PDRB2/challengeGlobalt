@@ -49,6 +49,8 @@ def metricas1():
     logging.info('el usuario ' + request.headers.get('user') + ' se logeo correctamente')
     try:
         logging.info('Se procede a intentar retornar el json de metricas 1')
+
+
         return (db.obtenerMetricas1(METRICAS_1))
     except:
         logging.warning('Error en la devolucion de json contactar con soporte!')
