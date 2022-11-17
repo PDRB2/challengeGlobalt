@@ -1,7 +1,9 @@
 import logging
 import os
 import sqlite3
+from datetime import datetime, date
 from sqlite3 import Error
+import re
 
 import pandas as pd
 import pandavro as pdx
@@ -153,6 +155,29 @@ def buscarSqlInjection(csv):
     return existe_injeccion_sql
 
 
+def elformatoDeFechasEsvalido(param):
+    esvalido = False
+
+    i = 0
+    for i in param:
+       # try:
+       #     print('vamos a validar el formato')
+       #     datetime.fromisoformat(i.replace('T', '+00:00'))
+       # except:
+       #        print('No tiene formato valido')
+       #        esvalido == False
+        try:
+            print('vamos a validar el formato')
+            print(str(i))
+            print(datetime.fromisoformat(i.replace('Z', '+00:00')))
+            esvalido == True
+        except ValueError:
+                     esvalido == False
+                     print('No tiene formato valido')
+
+    return not esvalido
+
+
 def son_metadatos_invalidos(csv, tipo_de_tabla):
     # buscamos los metadatos y validamos contra los informados en caso que
     # ya una condicion no cumpla se limita y se reporta el error
@@ -160,8 +185,6 @@ def son_metadatos_invalidos(csv, tipo_de_tabla):
     metadatos_validos = obtenerMetadatosValidos(tipo_de_tabla)
 
     i = 0
-    es_valido = False
-
     logger2.info('Metadatos del archivo ' + str(result.iloc[0]))
     logger2.info('Metadatos del schema ' + str(metadatos_validos['tipo_dato'].iloc[0]))
 
@@ -169,10 +192,11 @@ def son_metadatos_invalidos(csv, tipo_de_tabla):
         es_valido = str(result.iloc[i]) == str(metadatos_validos['tipo_dato'].iloc[i])
         if str(metadatos_validos['tipo_dato'].iloc[i]) == 'object' :
             es_valido = buscarSqlInjection(csv.iloc[:, i])
+
         if es_valido == False:
             i = len(result)
         i = i + 1
-
+    es_valido = elformatoDeFechasEsvalido(csv['datetime'])
     return es_valido
 
 
@@ -239,6 +263,7 @@ def insertarDatosDeApi(csv, tipo_de_tabla):
         return 'Error de logicas ' + tipo_de_tabla
 
 def insertardatos_y_bkp(csv, tipo_de_tabla):
+    #Con este metodo insertamos la tabla
     conn =  getConn()
     csv = buscarColumnasTabla(csv, tipo_de_tabla)
     csv.set_index('id', inplace=True)
@@ -249,6 +274,7 @@ def insertardatos_y_bkp(csv, tipo_de_tabla):
 
 
 def restaurarultimo_bkp(conn):
+    #con esto listamos el directorio de backups y vaciamos 
     dir_path = './backups'
     paths = os.listdir(dir_path)
     logger2.info('Se procede a buscar los archivos avro para rearmar la base de 0')
