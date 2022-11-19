@@ -1,9 +1,9 @@
 import logging
 import os
 import sqlite3
-from datetime import datetime, date
+from datetime import datetime
 from sqlite3 import Error
-import re
+
 
 import pandas as pd
 import pandavro as pdx
@@ -25,7 +25,7 @@ CONVERT_DICT_METRICAS_2 = {'department_id': int,
                            'hired': int
                            }
 CONSULTAS_METRICAS = [
-'''select department, job, cantidad  , mes as mes from (
+    '''select department, job, cantidad  , mes as mes from (
         Select department , jo.job ,count(hired.id) as cantidad , cast(substr( hired.datetime, 6, 2 ) as int) as mes 
            from
         hired_employees hired inner join
@@ -35,7 +35,7 @@ CONSULTAS_METRICAS = [
          where substr( hired.datetime, 1, 4 ) = '2021'
          group by department,jo.job , cast(substr( hired.datetime, 6, 2 ) as int)  
           ) b
-       ''' , '''select dep.id as department_id, dep.department as department , count(hired.id)  as cantidad ,(select Avg(hired.id)  from
+       ''', '''select dep.id as department_id, dep.department as department , count(hired.id)  as cantidad ,(select Avg(hired.id)  from
           hired_employees hired  where substr( hired.datetime, 1, 4 ) = '2021'  )as cantidad_media
         from departments dep
         inner join hired_employees hired on  dep.id =hired.department_id  
@@ -43,7 +43,8 @@ CONSULTAS_METRICAS = [
         group by dep.id , dep.department
         '''
 ]
-VALOR_METRICAS = ['metricas1','metricas2']
+VALOR_METRICAS = ['metricas1', 'metricas2']
+
 
 def create_connection(db_file):
     """ create a database connection to a SQLite database """
@@ -62,7 +63,7 @@ def initialize_data_base():
     conn = getConn()
     c = conn.cursor()
 
-    #c.execute("delete from hired_employees ")
+    # c.execute("delete from hired_employees ")
     c.execute('''DROP TABLE IF EXISTS  hired_employees ''')
     c.execute('''DROP TABLE IF EXISTS  departments ''')
     c.execute('''DROP TABLE IF EXISTS jobs ''')
@@ -145,12 +146,14 @@ def obtenerMetadatosValidos(tipo_de_tabla):
 
 
 def buscarSqlInjection(csv):
-    #en este metodo buscamos si existe alguna injeccion de sql para poder evitarlo
+    # en este metodo buscamos si existe alguna injeccion de sql para poder evitarlo
     # el false implica que el resultado devuelva true para que continue con el ciclo de validacion de registros
 
     df = pd.DataFrame(csv.copy(), columns=['string'])
     existe_injeccion_sql = False
-    existe_injeccion_sql = (df['string'].str.contains('Select').any() and df['string'].str.contains('Create').any() and df['string'].str.contains('Delete').any() and df['string'].str.contains('Drop').any() and df['string'].str.contains('Alter').any() )  ==False
+    existe_injeccion_sql = (df['string'].str.contains('Select').any() and df['string'].str.contains('Create').any() and
+                            df['string'].str.contains('Delete').any() and df['string'].str.contains('Drop').any() and
+                            df['string'].str.contains('Alter').any()) == False
 
     return existe_injeccion_sql
 
@@ -160,20 +163,20 @@ def elformatoDeFechasEsvalido(param):
 
     i = 0
     for i in param:
-       # try:
-       #     print('vamos a validar el formato')
-       #     datetime.fromisoformat(i.replace('T', '+00:00'))
-       # except:
-       #        print('No tiene formato valido')
-       #        esvalido == False
+        # try:
+        #     print('vamos a validar el formato')
+        #     datetime.fromisoformat(i.replace('T', '+00:00'))
+        # except:
+        #        print('No tiene formato valido')
+        #        esvalido == False
         try:
             print('vamos a validar el formato')
             print(str(i))
             print(datetime.fromisoformat(i.replace('Z', '+00:00')))
-            esvalido == True
+            esvalido = True
         except ValueError:
-                     esvalido == False
-                     print('No tiene formato valido')
+            esvalido = False
+            print('No tiene formato valido')
 
     return not esvalido
 
@@ -190,7 +193,7 @@ def son_metadatos_invalidos(csv, tipo_de_tabla):
 
     while i < len(result):
         es_valido = str(result.iloc[i]) == str(metadatos_validos['tipo_dato'].iloc[i])
-        if str(metadatos_validos['tipo_dato'].iloc[i]) == 'object' :
+        if str(metadatos_validos['tipo_dato'].iloc[i]) == 'object':
             es_valido = buscarSqlInjection(csv.iloc[:, i])
 
         if es_valido == False:
@@ -221,10 +224,10 @@ def existen_los_registros_anteriormente(csv, conn, tipo_de_tabla):
     existe = False
     i = 0
     cursor = conn.cursor()
-    cursor.execute('''SELECT DISTINCT id FROM ''' + tipo_de_tabla )
-    compare_df = pd.DataFrame.from_records(cursor.fetchall(),columns=[desc[0] for desc in cursor.description])
-    if csv.iloc[:, 0].isin(compare_df.iloc[:,0]).any():
-            existe = True
+    cursor.execute('''SELECT DISTINCT id FROM ''' + tipo_de_tabla)
+    compare_df = pd.DataFrame.from_records(cursor.fetchall(), columns=[desc[0] for desc in cursor.description])
+    if csv.iloc[:, 0].isin(compare_df.iloc[:, 0]).any():
+        existe = True
     cursor.close()
     logger2.info('se  valido si existe')
     return existe
@@ -234,7 +237,6 @@ def getConn():
     database = r"globalChallenge.db"
     conn = sqlite3.connect(database)
     return conn
-
 
 
 def insertarDatosDeApi(csv, tipo_de_tabla):
@@ -262,9 +264,10 @@ def insertarDatosDeApi(csv, tipo_de_tabla):
     except:
         return 'Error de logicas ' + tipo_de_tabla
 
+
 def insertardatos_y_bkp(csv, tipo_de_tabla):
-    #Con este metodo insertamos la tabla
-    conn =  getConn()
+    # Con este metodo insertamos la tabla
+    conn = getConn()
     csv = buscarColumnasTabla(csv, tipo_de_tabla)
     csv.set_index('id', inplace=True)
     csv.to_sql(tipo_de_tabla, conn, if_exists='replace', index=True)
@@ -274,21 +277,21 @@ def insertardatos_y_bkp(csv, tipo_de_tabla):
 
 
 def restaurarultimo_bkp(conn):
-    #con esto listamos el directorio de backups y vaciamos 
+    # con esto listamos el directorio de backups y vaciamos
     dir_path = './backups'
     paths = os.listdir(dir_path)
     logger2.info('Se procede a buscar los archivos avro para rearmar la base de 0')
     for i in paths:
-            backup = pdx.read_avro(dir_path+ '/' +i, na_dtypes=True)
-            sinfilename = (i.split('.',1))
-            insertardatos_y_bkp(backup,sinfilename[0])
-            logger2.info('Se restauro el backup ' + sinfilename[0])
+        backup = pdx.read_avro(dir_path + '/' + i, na_dtypes=True)
+        sinfilename = (i.split('.', 1))
+        insertardatos_y_bkp(backup, sinfilename[0])
+        logger2.info('Se restauro el backup ' + sinfilename[0])
 
     pass
 
 
 def restaurar_bkp():
-    #borramos las tablas validamos que no exista nada mas
+    # borramos las tablas validamos que no exista nada mas
     initialize_data_base()
     conn = getConn()
     c = conn.cursor()
@@ -299,65 +302,61 @@ def restaurar_bkp():
     return None
 
 
-
-
 def cargar_datos_iniciales():
-        #se validan si los datos iniciales se encuentran presentes sino se insertan.
-        paths = ['./archives/jobs.csv','./archives/departments.csv','./archives/hired_employees.csv']
-        tablas = ['jobs','departments','hired_employees']
-        i = 0
-        conn = getConn()
-        cursor = conn.cursor()
-        existen = False
-        while i < len(paths) and not existen:
-            cursor.execute('''SELECT * FROM  ''' + tablas[i])
-            csv = pd.read_csv(paths[i])
-            df = pd.DataFrame.from_records(cursor.fetchall(),
-                                           columns=[desc[0] for desc in cursor.description])
-            if df.iloc[:,0].isin(csv.iloc[:,0]).any():
-                existen = True
-            else:
-                insertardatos_y_bkp(csv, tablas[i])
-            i = i +1
-        conn.commit()
-        conn.close()
-        if not existen:
-            logger2.info('Se insertaron los registros iniciales')
-        else :
-            logger2.info('Registros iniciales cargados!')
-        return existen
+    # se validan si los datos iniciales se encuentran presentes sino se insertan.
+    paths = ['./archives/jobs.csv', './archives/departments.csv', './archives/hired_employees.csv']
+    tablas = ['jobs', 'departments', 'hired_employees']
+    i = 0
+    conn = getConn()
+    cursor = conn.cursor()
+    existen = False
+    while i < len(paths) and not existen:
+        cursor.execute('''SELECT * FROM  ''' + tablas[i])
+        csv = pd.read_csv(paths[i])
+        df = pd.DataFrame.from_records(cursor.fetchall(),
+                                       columns=[desc[0] for desc in cursor.description])
+        if df.iloc[:, 0].isin(csv.iloc[:, 0]).any():
+            existen = True
+        else:
+            insertardatos_y_bkp(csv, tablas[i])
+        i = i + 1
+    conn.commit()
+    conn.close()
+    if not existen:
+        logger2.info('Se insertaron los registros iniciales')
+    else:
+        logger2.info('Registros iniciales cargados!')
+    return existen
 
 
 def buscarNumeroMetrica(metricas1):
-    #metodo que busca el numero de metrica en la constante de valor de metricas para
-    #de esta manera dejarlo en una forma abierta a que se pueda expandir en un futuro
+    # metodo que busca el numero de metrica en la constante de valor de metricas para
+    # de esta manera dejarlo en una forma abierta a que se pueda expandir en un futuro
     opcion = -1
     index = 0
     while opcion == -1 and index < len(VALOR_METRICAS):
         if metricas1 == VALOR_METRICAS[index]:
-                opcion = index
-        index = index +1
+            opcion = index
+        index = index + 1
 
     return opcion
 
 
-def buscarConsultasMetricas(metricas1 ):
-    #metodo para buscar en las metricas correspondientes
+def buscarConsultasMetricas(metricas1):
+    # metodo para buscar en las metricas correspondientes
     # se busca mejor manera de relacionar evitando if, probablemente numerico desde origen
-    opcion = 0
-    opcion2 = 1
     opcion = buscarNumeroMetrica(metricas1)
     sql = ''
     if metricas1 == 'metricas1':
         sql = CONSULTAS_METRICAS[opcion]
     elif metricas1 == 'metricas2':
-        sql = CONSULTAS_METRICAS[opcion2]
-    logger2.info('Se procede a devolver la query de metricas ' + metricas1 )
+        sql = CONSULTAS_METRICAS[opcion]
+    logger2.info('Se procede a devolver la query de metricas ' + metricas1)
     return sql
 
 
 def cargarTablaMetricas(conn, metricas1):
-    #con este metodo se va a poblar la tabla que a posterior se presentaran los resultados
+    # con este metodo se va a poblar la tabla que a posterior se presentaran los resultados
     cursor = conn.cursor()
     tabla = metricas1
     query = buscarConsultasMetricas(metricas1)
@@ -370,21 +369,18 @@ def cargarTablaMetricas(conn, metricas1):
     pass
 
 
-
-def obtener_datos_del_cuatrimestre(cuatrimestre , numero_de_cuatrimestre,conn):
-    #Se genera un dataframe acorde a la query de negocio
+def obtener_datos_del_cuatrimestre(cuatrimestre, numero_de_cuatrimestre, conn):
+    # Se genera un dataframe acorde a la query de negocio
     cursor = conn.cursor()
     cursor.execute('''
-    select department, job, cantidad as Q'''+numero_de_cuatrimestre+'''
+    select department, job, cantidad as Q''' + numero_de_cuatrimestre + '''
      from metricas1 where mes between ''' + cuatrimestre + '''
                    order by department , job ''')
     df = pd.DataFrame.from_records(cursor.fetchall(), columns=[desc[0] for desc in cursor.description])
-    df['Q'+numero_de_cuatrimestre] = df['Q'+numero_de_cuatrimestre].astype(int)
+    df['Q' + numero_de_cuatrimestre] = df['Q' + numero_de_cuatrimestre].astype(int)
 
     return df
     pass
-
-
 
 
 def obtenerMetricas1(metricas):
@@ -394,14 +390,14 @@ def obtenerMetricas1(metricas):
     j = 1
     logger2.info('Se procede a generar el dataframe acorde a las nesesidades de negocio')
     for i in CUATRIMESTRES:
-            df = obtener_datos_del_cuatrimestre(i,str(j),conn)
-            if centinela  =='vacio':
-                centinela = 'no vacio'
-                df_row = df.copy()
-            else :
-                df_row= pd.merge(df_row, df,how='left')
+        df = obtener_datos_del_cuatrimestre(i, str(j), conn)
+        if centinela == 'vacio':
+            centinela = 'no vacio'
+            df_row = df.copy()
+        else:
+            df_row = pd.merge(df_row, df, how='left')
 
-            j = j +1
+        j = j + 1
 
     df_row = df_row.drop_duplicates()
     df_row = df_row.fillna(0)
@@ -413,15 +409,15 @@ def obtenerMetricas1(metricas):
     return result
 
 
-
-
 def obtenerMetricas2(metricas):
     conn = getConn()
-    cargarTablaMetricas(conn,metricas)
+    cargarTablaMetricas(conn, metricas)
 
     logger2.info('Se procede a generar el dataframe acorde a las nesesidades de negocio')
     cursor = conn.cursor()
-    cursor.execute('Select department_id , department , cantidad_media as hired from metricas2 where cantidad > cantidad_media order by cantidad desc')
+    cursor.execute(
+        'Select department_id , department , cantidad_media as hired from metricas2 where cantidad > cantidad_media '
+        'order by cantidad desc')
 
     df = pd.DataFrame.from_records(cursor.fetchall(), columns=[desc[0] for desc in cursor.description])
     print('obtube el df')
@@ -429,6 +425,5 @@ def obtenerMetricas2(metricas):
     print('converti el diccionario')
     result = pd.DataFrame(df).to_json(orient='records')
     print(result)
-
 
     return result

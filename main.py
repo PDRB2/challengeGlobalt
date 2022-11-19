@@ -8,8 +8,10 @@ if __name__ == '__main__':
     # el loop no era una condicion para el desafio pero quedo como un agregado para poder hacerlo mas completa
     # la solucion , sencillamente lo que hace es forzar al funcionamiento desado
     # esta solucion solo en caso que se restaure el backup se tomaran los registros que guarde la api
+    # sino siempre se sobrescribira
 
     opcion = input("Eliga su opcion: 1 iniciar apy , 2 borrar_la_base , 3 restaurar backup, 4 generar metricas")
+
     while opcion not in opciones:
         opcion = input("Opcion incorrecta: 1 iniciar apy , 2 borrar_la_base , 3 restaurar backup , 4 generar metricas ")
     if opcion == '1':

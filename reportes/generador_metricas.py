@@ -1,7 +1,6 @@
 import logging
 
 import pandas as pd
-from matplotlib import pyplot as plt
 import dataframe_image as dfi
 
 from router.api import handle

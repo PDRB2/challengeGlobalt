@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify, app
+from flask import Flask, request,  app
 import pandas as pd
 import logging as logging
 
@@ -15,7 +15,7 @@ import conn.db as db
 
 
 def validarCredenciales(user, credentials):
-    return (user == USUARIO and CREDECIALES == credentials)
+    return user == USUARIO and CREDECIALES == credentials
 
 
 @app.route('/datos', methods=["POST"])
