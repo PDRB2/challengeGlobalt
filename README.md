@@ -1,5 +1,6 @@
 # challengeGlobalt
-Create README.md
+
+
 Desafio consistente en crear un modelo de datos y exponerlo mediante una api, con las complejidades que todo manejo de volumenes pequenios puede conllevar, con una base portable y validaciones de datos.
 Se presenta el formato de los metodos existentes y el formato correcto de los json en caso que se nesesite.
 Ademas cuenta con una pequeña validacion de seguridad.
