@@ -4,7 +4,6 @@ import sqlite3
 from datetime import datetime
 from sqlite3 import Error
 
-
 import pandas as pd
 import pandavro as pdx
 
@@ -159,24 +158,18 @@ def buscarSqlInjection(csv):
 
 
 def elformatoDeFechasEsvalido(param):
+    # En este metodo solo con intentar validar con el metodo fromisoformat nos permite mediante el try and catch validar
+    # si el mismo pertenece al formato, practico
     esvalido = False
-
-    i = 0
     for i in param:
-        # try:
-        #     print('vamos a validar el formato')
-        #     datetime.fromisoformat(i.replace('T', '+00:00'))
-        # except:
-        #        print('No tiene formato valido')
-        #        esvalido == False
         try:
-            print('vamos a validar el formato')
-            print(str(i))
-            print(datetime.fromisoformat(i.replace('Z', '+00:00')))
+            date = (datetime.fromisoformat(i.replace('Z', '+00:00')))
             esvalido = True
+
         except ValueError:
+            logger2.info('No posee el formato fecha, se ira a error en metadatos')
             esvalido = False
-            print('No tiene formato valido')
+
 
     return not esvalido
 
@@ -186,11 +179,7 @@ def son_metadatos_invalidos(csv, tipo_de_tabla):
     # ya una condicion no cumpla se limita y se reporta el error
     result = csv.dtypes
     metadatos_validos = obtenerMetadatosValidos(tipo_de_tabla)
-
     i = 0
-    logger2.info('Metadatos del archivo ' + str(result.iloc[0]))
-    logger2.info('Metadatos del schema ' + str(metadatos_validos['tipo_dato'].iloc[0]))
-
     while i < len(result):
         es_valido = str(result.iloc[i]) == str(metadatos_validos['tipo_dato'].iloc[i])
         if str(metadatos_validos['tipo_dato'].iloc[i]) == 'object':
@@ -207,7 +196,6 @@ def generarBackup(conn):
     cursor = conn.cursor()
     TIPO_DE_TABLA = ['jobs', 'departments', 'hired_employees']
     PATH_FINAL = './backups/'
-
     for i in TIPO_DE_TABLA:
         cursor.execute('''Select * from ''' + i)
         df = pd.DataFrame.from_records(cursor.fetchall(),
@@ -234,6 +222,7 @@ def existen_los_registros_anteriormente(csv, conn, tipo_de_tabla):
 
 
 def getConn():
+    #retorna la base de datos, de no existir la crea
     database = r"globalChallenge.db"
     conn = sqlite3.connect(database)
     return conn
